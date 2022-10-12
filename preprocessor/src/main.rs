@@ -119,7 +119,7 @@ fn strncpy<const N: usize>(dest: &mut [u8; N], src: &str) {
 }
 
 /// Temporary workaround while we wait for write_all_vectored() to be stabilized.
-/// This version guarentees that all data is written.
+/// This version guarantees that all data is written.
 fn writev(dest: &mut File, src: &[&[u8]]) -> Result<(), Error> {
     for &buf in src.iter() {
         dest.write_all(buf)?;

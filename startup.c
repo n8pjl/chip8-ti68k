@@ -320,7 +320,7 @@ static enum ch8_error load_dispatch(struct ch8_state *state, HSym handle)
  * Attempts to load a file from user supplied arguments. Fails if more than one
  * argument is passed, or if the argument is not a valid file path.
  *
- * Saftey: can trigger heap compression.
+ * Safety: can trigger heap compression.
  */
 static enum ch8_error load_path(struct ch8_state *state)
 {

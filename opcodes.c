@@ -605,7 +605,7 @@ OPCODE_HANDLER(ch8_rpl_store)
 	return E_OK;
 }
 
-// fx85 - Load V0 to Vx from rpl persistet storage
+// fx85 - Load V0 to Vx from rpl persistent storage
 // Note: see ch8_rpl_store()
 OPCODE_HANDLER(ch8_rpl_load)
 {
