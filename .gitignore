@@ -1,0 +1,12 @@
+.vscode/
+roms/
+output/
+preprocessor/target/
+*.89?
+*.9x?
+*.v2?
+*.o
+*.s
+*.exe
+.clang-format
+.clangd
