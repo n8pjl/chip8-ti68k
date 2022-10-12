@@ -126,6 +126,14 @@ static const char *get_error_message(enum ch8_error err)
 	}
 }
 
+static void display_about(void)
+{
+	DlgMessage(
+		"About",
+		"chip8-ti68k v0.9\nA (S)CHIP-8 emulator for ti68k graphing calculators.\n\nCopyright 2022 Peter Lafreniere\nThis is free software. See COPYING for more details.",
+		BT_NONE, BT_OK);
+}
+
 /* 
  * Provides a very simple LZSS decompressor for roms and savestates.
  *
@@ -317,12 +325,20 @@ static enum ch8_error load_dispatch(struct ch8_state *state, HSym handle)
 static enum ch8_error load_path(struct ch8_state *state)
 {
 	ESI arg = top_estack;
+	const char *str;
 	HSym handle;
 
 	if (GetArgType(arg) != STR_TAG)
 		return E_INVALID_ARGUMENT;
 
-	handle = SymFind(GetSymstrArg(arg));
+	str = GetSymstrArg(arg);
+
+	if (!SymCmp(str, SYMSTR_CONST("about"))) {
+		display_about();
+		return E_SILENT_EXIT;
+	}
+
+	handle = SymFind(str);
 
 	if (handle.folder == 0)
 		return E_INVALID_ARGUMENT;
@@ -402,8 +418,17 @@ static enum ch8_error save_state(const struct ch8_state *state)
  */
 void _main(void)
 {
+	// static variables persist changes across program runs.
+	// This does not work for archived programs.
+	static _Bool has_been_run = FALSE;
+
 	struct ch8_state *state;
 	enum ch8_error result;
+
+	if (!has_been_run) {
+		has_been_run = TRUE;
+		display_about();
+	}
 
 	if (!(state = HLock(HeapAlloc(sizeof(struct ch8_state))))) {
 		ST_helpMsg(get_error_message(E_OOM));
@@ -433,9 +458,8 @@ void _main(void)
 	if (result != E_SILENT_EXIT)
 		ST_helpMsg(get_error_message(result));
 
-	if (result == E_EXIT_SAVE) {
+	if (result == E_EXIT_SAVE)
 		save_state(state);
-	}
 
 exit:
 	HeapFree(HeapPtrToHandle(state));
