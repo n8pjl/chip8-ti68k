@@ -331,14 +331,14 @@ static enum ch8_error load_path(struct ch8_state *state)
 	if (GetArgType(arg) != STR_TAG)
 		return E_INVALID_ARGUMENT;
 
-	str = GetSymstrArg(arg);
+	str = GetStrnArg(arg);
 
-	if (!SymCmp(str, SYMSTR_CONST("about"))) {
+	if (!SymCmp(str, "about")) {
 		display_about();
 		return E_SILENT_EXIT;
 	}
 
-	handle = SymFind(str);
+	handle = SymFind(SYMSTR(str));
 
 	if (handle.folder == 0)
 		return E_INVALID_ARGUMENT;
