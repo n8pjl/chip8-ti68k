@@ -1,0 +1,123 @@
+///////////////////////////////////////////////////////////////////////////////
+////////////////
+////////
+////	Chip8-TI68k: A full-featured (S)CHIP-8 emulator for your TI calculator
+////			By: Peter Lafreniere <peter@n8pjl.ca>
+////////
+////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+____________
+Introduction:
+¯¯¯¯¯¯¯¯¯¯¯¯
+Have you ever wanted to play games on your calculator? Of course you have.
+You don't have to lie.
+
+How about CHIP-8 games? If you've never heard about CHIP-8, then you're not
+alone.
+
+CHIP-8 is a format of retro game roms that are particularly well-suited to
+running on graphing calculators. Over time, there has been a huge amount of
+extensions and implementations that are often not compatible.
+
+This program is designed to be compatible with the vast majority of roms found
+on the internet. It supports SCHIP and some XO-CHIP features in addition to
+the base CHIP-8 spec.
+
+_____
+Usage:
+¯¯¯¯¯
+First, you need CHIP-8 roms. They can be found easily with the use of your
+preferred internet search engine. Unlike roms for true consoles, these roms
+are perfectly legal to distribute online. I suggest starting by looking at the
+roms available at <https://github.com/JohnEarnest/chip8Archive>.
+
+Preprocessor
+¯¯¯¯¯¯¯¯¯¯¯¯
+Once you have your roms, you must transform them into files suitable for your
+calculator. This can be done with the ch8ti-prep.exe utility found in this
+project.
+
+To use ch8ti-prep, you need to use the command line terminal. Just run:
+
+"./ch8ti-prep.exe -c <ti89|ti92p|v200> [name of rom to process]"
+You should find your processed rom in the same folder as your input rom.
+For example:
+
+"./ch8ti-prep.exe -c ti89 roms/cave.ch8"
+will produce a file named cave.89y in the folder roms.
+
+ch8ti-prep has several other options controlling output. You can see them by
+running:
+"./ch8ti-prep.exe --help"
+
+Calculator
+¯¯¯¯¯¯¯¯¯¯
+The only files that you will need on your calculator are the processed roms
+and the ch8ti program that matches your calculator model.
+
+Once those have been transferred, run ch8ti() and you will be prompted to
+select the file you wish to play.
+
+Alternatively, you can call ch8ti with the rom/savestate you wish to play.
+e.g. "ch8ti("cave")"
+
+The CHIP-8 keyboard maps to the calculator keyboards like so:
+  |1|2|3|C|
+  |4|5|6|D|
+  |7|8|9|E|
+  |A|0|B|F|
+      ||
+      ||
+      \/
+  |7|8|9|x|
+  |4|5|6|-|
+  |1|2|3|+|
+  |0|.|-|e|
+
+Special keys:
+Esc can be used to exit the program and F1 can be used to open the savestate
+dialog.
+
+Also note that the up, down, left, and right arrow keys are bound to the 5, 8,
+7, and 9 CHIP8 keys, respectively. 2nd (and HAND) can similarly be used as the
+CHIP8 6 key.
+
+You will rarely use a key other than an arrow key or 2nd.
+
+_____
+About:
+¯¯¯¯¯
+This program was developed by one high school student during their (surprisingly)
+limited free time. If you have any comments, questions, or suggestions, please
+feel free to reach out to me (Peter Lafreniere) with them.
+
+The source code should be included along with the executables. It's decently
+hackable, so feel free to hack at it all you would like.
+
+This emulator implements every CHIP8 and SCHIP opcode, as well as several
+Octo extensions. You should not have any issue running monochrome SCHIP roms.
+
+Note: The persistent storage opcodes are faked. There is no persistence past
+the end of the current emulator invocation.
+
+_______
+History:
+¯¯¯¯¯¯¯
+v0.9 (2022-10-12)
+ - Initial public availability.
+ - Marked as pre-release.
+
+______
+Thanks:
+¯¯¯¯¯¯
+A big thank you is owed to the developers of the tigcc/gcc4ti projects. This
+program wouldn't be anywhere without the tools and documentation provided by
+these people.
+
+Tobias Langhoff for their high quality documentation on CHIP8.
+<https://chip-8.github.io/extensions/>
+
+John Earnest for their Octo interpreter, which I used as a reference to debug
+against. John also curated the Chip8 Community Archive, a large collection of
+CHIP8 roms.
