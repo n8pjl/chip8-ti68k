@@ -77,11 +77,10 @@ static enum ch8_error ch8_stack_pop(struct ch8_stack *stack, uint16_t *x)
  *  |1|2|3|+|
  *  |0|.|-|e|
  *
- * In addition, esc can be used to exit the program, F5 can be used to open the
- * savestate dialog. Also note that the up, down, left, and right arrow keys are
- * bound to the 5, 8, 7, and 9 CHIP8 keys, respectively. F2 (and HAND) can
- * similarly be used for the CHIP8 6 key in addition to the 3 key on the
- * calculators.
+ * In addition, esc can be used to exit the program and F1 can be used to open
+ * the savestate dialog. Also note that the up, down, left, and right arrow
+ * keys are bound to the 5, 8, 7, and 9 CHIP8 keys, respectively. 
+ * 2nd (and HAND) can similarly be used for the CHIP8 6 key.
  */
 static void read_keyboard(char out[18])
 {
