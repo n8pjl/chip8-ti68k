@@ -60,6 +60,10 @@ struct ch8_stack {
 	uint8_t sp;
 };
 
+struct ch8_version {
+	uint8_t major, minor, patch;
+};
+
 /*
  * Saved state of the game. To maintain save game compatibility, do not
  * modify this struct. While it is a bad idea to make saves ABI dependant,
@@ -67,11 +71,7 @@ struct ch8_stack {
  * used to detect incompatible saves.
  */
 struct ch8_state {
-	struct {
-		uint8_t major;
-		uint8_t minor;
-		uint8_t patch;
-	} version;
+	struct ch8_version version;
 	struct ch8_stack stack;
 	long randstate; // A copy of the __randseed global variable used by tigcclib.
 	uint16_t pc;
@@ -87,11 +87,7 @@ struct ch8_state {
 };
 
 struct ch8_rom {
-	struct {
-		uint8_t major;
-		uint8_t minor;
-		uint8_t patch;
-	} version;
+	struct ch8_version version;
 	uint8_t rom[];
 } __attribute__((packed));
 
