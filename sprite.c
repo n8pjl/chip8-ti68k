@@ -76,54 +76,20 @@ _Bool draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
 }
 
 /*
- * The same as draw_sprite_16_hi(), except it only loads sprites as 8 pixels per
- * line. See draw_sprite_16_hi().
+ * The same as draw_sprite_16_hi(), except it only loads sprites as 8 pixels
+ * per line. This function is a shim to remove ~150 bytes from the resulting
+ * binary.
  *
- * This function should be removed to optimize for space.
- *
- * Safety: can be called from interrupt context. Directly modifies lcd memory.
- * Do not use when the screen is redirected.
+ * Safety: See draw_sprite_16_hi()
  */
 _Bool draw_sprite_8_hi(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n)
 {
-	uint16_t mask = UINT16_MAX;
-	uint_fast8_t shft;
-	uint32_t ret = 0;
-	uint32_t line;
-	uint32_t data;
-	void *ptr;
+	uint16_t sprite16[n];
 
-	x %= 128;
-	y %= 64;
+	for (uint8_t i = 0; i < n; i++)
+		sprite16[i] = sprite8[i] << 8;
 
-	x += X_BASE;
-
-	shft = 24 - (x % 16);
-
-	if (x >= 128 + X_BASE) {
-		mask = UINT32_MAX << (uint32_t)(x % 16);
-
-		// Recurse to draw the overshoot. Can only happen once per call.
-		uint8_t left_sprite[n];
-		for (short i = 0; i < n; i++)
-			left_sprite[i] = (sprite8[i] & ~mask) << shft;
-
-		ret = draw_sprite_8_hi(left_sprite, 0, y, n);
-	}
-
-	for (short i = 0; i < n; i++) {
-		ptr = LCD_MEM;
-		ptr += ((y + i) % 64 + Y_BASE) * 30;
-		ptr += x / 8 & ~1;
-		line = *(uint32_t *)ptr;
-		data = sprite8[i];
-		data &= mask;
-		data <<= shft;
-		ret |= data & line;
-		*(uint32_t *)ptr = line ^ data;
-	}
-
-	return ret;
+	return draw_sprite_16_hi(sprite16, x, y, n);
 }
 
 /*
