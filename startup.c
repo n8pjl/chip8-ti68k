@@ -93,8 +93,10 @@ DEFINE_INT_HANDLER(timer_update_interrupt)
 	}
 }
 
-// Get error message from error type enum. Note that identical return values are
-// constant folded.
+/*
+ * Get error message from error type enum. Note that identical return values are
+ * constant folded.
+ */
 static const char *get_error_message(enum ch8_error err)
 {
 	switch (err) {
@@ -126,6 +128,11 @@ static const char *get_error_message(enum ch8_error err)
 	}
 }
 
+/*
+ * Do not forget to update this message when the release version changes.
+ *
+ * Safety: can trigger heap compression.
+ */
 static void display_about(void)
 {
 	DlgMessage(
@@ -172,9 +179,8 @@ static uint16_t decompress(uint8_t *restrict dest, const uint8_t *restrict src,
  * PRNG settings were found by trial and error with a handheld stopwatch.
  * (1, 241) = 62.5Hz, (0, 0) = 62.5Hz, and (1, 240) = 58.8Hz.
  * 
- * Safety: can trigger heap compression; messes
- * with interrupts and the programable rate generator. See ch8_run() for
- * more.
+ * Safety: can trigger heap compression; messes with interrupts and the
+ * programable rate generator. See ch8_run() for more.
  */
 static enum ch8_error ch8_start(struct ch8_state *state)
 {
@@ -228,8 +234,8 @@ static enum ch8_error ch8_start(struct ch8_state *state)
 }
 
 /*
- * Returns a new state from the given rom. randstate and checksum are
- * left uninitialized.
+ * Returns a new state from the given rom. randstate and display are left
+ * uninitialized.
  */
 static enum ch8_error load_rom(const MULTI_EXPR *rom, struct ch8_state *state)
 {
@@ -251,17 +257,17 @@ static enum ch8_error load_rom(const MULTI_EXPR *rom, struct ch8_state *state)
 	memcpy(state->memory, CHIP8_SPRITES, sizeof(CHIP8_SPRITES));
 	randomize();
 
-	if (rom->Size - sizeof(pack->header) > 0x1000 - 0x200)
+	if (rom->Size - sizeof(pack->version) > 0x1000 - 0x200)
 		return E_ROM_LOAD;
 
 	pack = (struct ch8_rom *)rom->Expr;
 
-	if (pack->header.major != MAJOR_VERSION ||
-	    pack->header.minor > MINOR_VERSION)
+	if (pack->version.major != MAJOR_VERSION ||
+	    pack->version.minor > MINOR_VERSION)
 		return E_VERSION;
 
 	if (!decompress(state->memory + 0x200, pack->rom,
-			rom->Size - sizeof(pack->header)))
+			rom->Size - sizeof(pack->version)))
 		return E_ROM_LOAD;
 
 	return E_OK;
@@ -270,16 +276,13 @@ static enum ch8_error load_rom(const MULTI_EXPR *rom, struct ch8_state *state)
 /*
  * Loads a snapshot of chip8 state from a pointer to a buffer,
  * validates said buffer, and returns an error if the buffer is invalid.
- * It takes a void pointer because the struct pointed to may have a different
- * layout based on the version.
  */
 static enum ch8_error load_state(const MULTI_EXPR *input,
 				 struct ch8_state *state)
 {
 	const struct ch8_state *rodata;
 
-	// The structs need to be the same for states. TODO: change for later
-	// versions
+	// The structs need to be the same for states.
 	if (input->Size - sizeof(C8SV_TAG) != sizeof(*rodata))
 		return E_VERSION;
 
@@ -297,8 +300,6 @@ static enum ch8_error load_state(const MULTI_EXPR *input,
 
 /*
  * Validates and dispatches a file to the appropriate loader.
- * 
- * Safety: can trigger heap compression.
  */
 static enum ch8_error load_dispatch(struct ch8_state *state, HSym handle)
 {
@@ -407,7 +408,7 @@ static enum ch8_error save_state(const struct ch8_state *state)
 	memcpy((void *)saved_state + sizeof(struct ch8_state), C8SV_TAG,
 	       sizeof(C8SV_TAG));
 
-	// TODO: Compress save states and (?) roms too.
+	// TODO: Compress save states. Previous attempts were too slow to use.
 
 	return E_OK;
 }

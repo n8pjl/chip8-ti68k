@@ -65,8 +65,6 @@ struct ch8_stack {
  * modify this struct. While it is a bad idea to make saves ABI dependant,
  * there is only one ABI that the compiler can target. The version number is
  * used to detect incompatible saves.
- * 
- * TODO: Optimize this struct for space. Will need to reread the abi.
  */
 struct ch8_state {
 	struct {
@@ -93,7 +91,7 @@ struct ch8_rom {
 		uint8_t major;
 		uint8_t minor;
 		uint8_t patch;
-	} header;
+	} version;
 	uint8_t rom[];
 } __attribute__((packed));
 
