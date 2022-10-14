@@ -77,7 +77,9 @@ _Bool draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
 
 /*
  * The same as draw_sprite_16_hi(), except it only loads sprites as 8 pixels per
- * line. See draw_sprite_16_hi(). 
+ * line. See draw_sprite_16_hi().
+ *
+ * This function should be removed to optimize for space.
  *
  * Safety: can be called from interrupt context. Directly modifies lcd memory.
  * Do not use when the screen is redirected.
@@ -125,7 +127,7 @@ _Bool draw_sprite_8_hi(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n)
 }
 
 /*
- * Draws a properly clipped chip-8 sprite, expanding low-res sprites to 
+ * Draws a properly clipped chip-8 sprite, expanding low-res sprites to
  * their high-res equivalents.
  * 
  * Safety: See draw_sprite_16()
@@ -199,6 +201,7 @@ void restore_chip8_screen(const uint8_t src[1024])
 		       src + i * row_bytes, row_bytes);
 }
 
+// 00FB = Scroll display right by 4 screen pixels.
 void ch8_scroll_right(void)
 {
 	uint8_t carry;
@@ -216,6 +219,7 @@ void ch8_scroll_right(void)
 	}
 }
 
+// 00FC - Scroll display left by 4 screen pixels.
 void ch8_scroll_left(void)
 {
 	uint8_t carry;
@@ -233,6 +237,7 @@ void ch8_scroll_left(void)
 	}
 }
 
+// 00Cn - Scroll display n screen pixels down.
 void ch8_scroll_down(uint16_t op)
 {
 	memmove(LCD_MEM + (Y_BASE + (op & 0xF)) * 30, LCD_MEM + Y_BASE * 30,
