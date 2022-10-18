@@ -450,7 +450,7 @@ OPCODE_HANDLER(ch8_key_set)
 	char board[18];
 	uint8_t key = state->registers[second(op)];
 
-	if (key > 16)
+	if (key >= 16)
 		goto exit;
 
 	read_keyboard(board);
@@ -470,14 +470,10 @@ OPCODE_HANDLER(ch8_key_unset)
 	char board[18];
 	uint8_t key = state->registers[second(op)];
 
-	if (key > 16)
-		goto exit;
-
 	read_keyboard(board);
 
-	if (!board[key])
+	if ((key < 16 && !board[key]) || key >= 16)
 		state->pc += 2;
-exit:
 	return E_OK;
 }
 
