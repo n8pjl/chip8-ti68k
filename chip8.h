@@ -27,10 +27,10 @@
 #include <stdint.h>
 
 // The major version number is used for rom and save file format compatibility.
-#define MAJOR_VERSION 0
+#define MAJOR_VERSION 1
 // The minor version is used for feature changes that are backwards
 // (but not forward) compatible.
-#define MINOR_VERSION 9
+#define MINOR_VERSION 0
 // The patch version is used for bug fixes that do not change compatiblity.
 #define PATCH_VERSION 0
 

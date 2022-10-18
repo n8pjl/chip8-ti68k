@@ -23,8 +23,8 @@ use std::{
 use binary_layout::prelude::*;
 use clap::{Parser, ValueEnum};
 
-const MAJOR_VERSION: u8 = 0;
-const MINOR_VERSION: u8 = 9;
+const MAJOR_VERSION: u8 = 1;
+const MINOR_VERSION: u8 = 0;
 const PATCH_VERSION: u8 = 0;
 
 // TODO: Make prettier

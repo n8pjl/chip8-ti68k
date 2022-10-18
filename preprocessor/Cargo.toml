@@ -1,6 +1,6 @@
 [package]
 name = "ch8ti-prep"
-version = "0.9.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Peter Lafreniere <peter@n8pjl.ca>"]
 license = "GPL-3.0+"
