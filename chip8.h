@@ -120,6 +120,7 @@ void restore_chip8_screen(const uint8_t *src);
 void ch8_scroll_right(enum ch8_plane planes);
 void ch8_scroll_left(enum ch8_plane planes);
 void ch8_scroll_down(enum ch8_plane planes, uint16_t op);
+void ch8_scroll_up(enum ch8_plane planes, uint16_t op);
 void ch8_clear_background(void);
 void ch8_set_background(void);
 

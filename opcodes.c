@@ -648,6 +648,9 @@ static enum ch8_error ch8_dispatch_0(struct ch8_state *state, uint16_t op)
 	case 0xC:
 		ch8_scroll_down(state->planes, op);
 		return E_OK;
+	case 0xD:
+		ch8_scroll_up(state->planes, op);
+		return E_OK;
 	case 0xE:
 
 		switch (last(op)) {

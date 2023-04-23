@@ -269,11 +269,12 @@ void ch8_scroll_left(enum ch8_plane planes)
 }
 
 // Wrapped by ch8_scroll_down()
-static void _ch8_scroll_down(void *lcd, uint16_t op)
+static void _ch8_scroll_down(void *lcd, uint8_t n)
 {
-	memmove(lcd + (Y_BASE + (op & 0xF)) * 30, lcd + Y_BASE * 30,
-		30 * (63 - (op & 0xF)));
-	memset(lcd + Y_BASE * 30, 0, 30 * (op & 0xF));
+	memmove(lcd + (Y_BASE + n) * 30, lcd + Y_BASE * 30, 30 * (63 - n));
+
+	for (short i = Y_BASE; i < Y_BASE + n; i++)
+		memset(lcd + i * 30 + X_BASE / 8, 0, 16);
 }
 
 // 00Cn - Scroll display n screen pixels down.
@@ -281,9 +282,28 @@ static void _ch8_scroll_down(void *lcd, uint16_t op)
 void ch8_scroll_down(enum ch8_plane planes, uint16_t op)
 {
 	if (planes & C8_PLANE_LIGHT)
-		_ch8_scroll_down(GrayGetPlane(LIGHT_PLANE), op);
+		_ch8_scroll_down(GrayGetPlane(LIGHT_PLANE), op & 0xF);
 	if (planes & C8_PLANE_DARK)
-		_ch8_scroll_down(GrayGetPlane(DARK_PLANE), op);
+		_ch8_scroll_down(GrayGetPlane(DARK_PLANE), op & 0xF);
+}
+
+// Wrapped by ch8_scroll_up()
+static void _ch8_scroll_up(void *lcd, uint8_t n)
+{
+	memmove(lcd + Y_BASE * 30, lcd + (Y_BASE + n) * 30, 30 * (63 - n));
+
+	for (short i = Y_BASE + (63 - n); i < Y_BASE + 64; i++)
+		memset(lcd + i * 30 + X_BASE / 8, 0, 16);
+}
+
+// 00Dn - Scroll display n screen pixels up. (XO-CHIP)
+// Wrapper around _ch8_scroll_up()
+void ch8_scroll_up(enum ch8_plane planes, uint16_t op)
+{
+	if (planes & C8_PLANE_LIGHT)
+		_ch8_scroll_up(GrayGetPlane(LIGHT_PLANE), op & 0xF);
+	if (planes & C8_PLANE_DARK)
+		_ch8_scroll_up(GrayGetPlane(DARK_PLANE), op & 0xF);
 }
 
 static void _ch8_set_background(void *plane, short val)
