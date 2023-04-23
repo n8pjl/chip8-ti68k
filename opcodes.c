@@ -487,6 +487,17 @@ OPCODE_HANDLER(ch8_key_unset)
 	return E_OK;
 }
 
+// fn01 - Set planes active = n, with 1 = light and 2 = dark. (XO-CHIP)
+// Bitmask can be OR-ed together.
+OPCODE_HANDLER(ch8_set_draw_target)
+{
+	if (second(op) > 3)
+		return E_INVALID_OPCODE;
+
+	state->planes = second(op);
+	return E_OK;
+}
+
 // fx07 - Set Vx = delay timer
 OPCODE_HANDLER(ch8_read_timer)
 {
@@ -722,6 +733,8 @@ static enum ch8_error ch8_dispatch_f(struct ch8_state *state, uint16_t op)
 	switch (third(op)) {
 	case 0x0:
 		switch (last(op)) {
+		case 0x1:
+			return ch8_set_draw_target(state, op);
 		case 0x7:
 			return ch8_read_timer(state, op);
 		case 0xA:
