@@ -137,7 +137,11 @@ static void display_about(void)
 {
 	DlgMessage(
 		"About",
-		"chip8-ti68k v1.0\nA (S)CHIP-8 emulator for ti68k graphing calculators.\n\nCopyright 2022 Peter Lafreniere\nThis is free software. See COPYING for more details.",
+		"chip8-ti68k v1.0\n"
+		"A (S)CHIP-8 emulator for ti68k graphing calculators.\n"
+		"\n"
+		"Copyright 2022 Peter Lafreniere\n"
+		"This is free software. See COPYING for more details.",
 		BT_NONE, BT_OK);
 }
 
