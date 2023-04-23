@@ -49,6 +49,13 @@ enum ch8_error {
 	E_UNKNOWN_ERR,
 };
 
+enum ch8_plane {
+	C8_PLANE_NONE = 0,
+	C8_PLANE_LIGHT = 1,
+	C8_PLANE_DARK = 2,
+	C8_PLANE_BOTH = 3,
+} __attribute__((packed));
+
 /*
  * The original CHIP-8 interpreter had a 12-entry stack, but all modern
  * implementations that I know of use at least a 16-entry stack.
@@ -74,6 +81,7 @@ struct ch8_state {
 	struct ch8_version version;
 	struct ch8_stack stack;
 	long randstate; // A copy of the __randseed global variable used by tigcclib.
+	enum ch8_plane planes;
 	uint16_t pc;
 	uint16_t I;
 	_Bool from_state;
@@ -82,7 +90,7 @@ struct ch8_state {
 	volatile uint8_t delay_timer;
 	volatile uint8_t sound_timer;
 	uint8_t memory[4096];
-	uint8_t display[1024];
+	uint8_t display[2048]; // Both light and dark planes.
 	uint8_t rpl_fake[16];
 };
 
@@ -99,16 +107,20 @@ struct ch8_stack ch8_stack_new(void);
 enum ch8_error ch8_run(struct ch8_state *state);
 
 // sprite.c
-_Bool draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
-			uint8_t n);
-_Bool draw_sprite_16_lo(const uint16_t *sprite16, uint8_t x, uint8_t y,
-			uint8_t n);
-_Bool draw_sprite_8_hi(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n);
-_Bool draw_sprite_8_lo(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n);
-void save_chip8_screen(uint8_t dest[1024]);
-void restore_chip8_screen(const uint8_t src[1024]);
-void ch8_scroll_right(void);
-void ch8_scroll_left(void);
-void ch8_scroll_down(uint16_t op);
+_Bool draw_sprite_16_hi(enum ch8_plane planes, const uint16_t *sprite16,
+			uint8_t x, uint8_t y, uint8_t n);
+_Bool draw_sprite_16_lo(enum ch8_plane planes, const uint16_t *sprite16,
+			uint8_t x, uint8_t y, uint8_t n);
+_Bool draw_sprite_8_hi(enum ch8_plane planes, const uint8_t *sprite8, uint8_t x,
+		       uint8_t y, uint8_t n);
+_Bool draw_sprite_8_lo(enum ch8_plane planes, const uint8_t *sprite8, uint8_t x,
+		       uint8_t y, uint8_t n);
+void save_chip8_screen(uint8_t *dest);
+void restore_chip8_screen(const uint8_t *src);
+void ch8_scroll_right(enum ch8_plane planes);
+void ch8_scroll_left(enum ch8_plane planes);
+void ch8_scroll_down(enum ch8_plane planes, uint16_t op);
+void ch8_clear_background(void);
+void ch8_set_background(void);
 
 #endif /* CHIP8_H */

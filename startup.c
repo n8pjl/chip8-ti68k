@@ -18,6 +18,8 @@
 #include <alloc.h>
 #include <args.h>
 #include <dialogs.h>
+#include <graph.h>
+#include <gray.h>
 #include <intr.h>
 #include <statline.h>
 #include <stdlib.h>
@@ -69,25 +71,21 @@ DEFINE_INT_HANDLER(timer_update_interrupt)
 {
 	static volatile _Bool is_sound_on = FALSE;
 
-	if (global_state->delay_timer > 0)
-		global_state->delay_timer--;
-	if (global_state->sound_timer > 0)
-		global_state->sound_timer--;
+	uint8_t dtimer = global_state->delay_timer;
+	uint8_t stimer = global_state->sound_timer;
 
-	if (global_state->sound_timer && !is_sound_on) {
-		uint8_t saved[1024];
+	if (dtimer)
+		global_state->delay_timer = --dtimer;
 
-		save_chip8_screen(saved);
-		memset(LCD_MEM, -1, LCD_SIZE);
-		restore_chip8_screen(saved);
+	if (stimer)
+		global_state->sound_timer = --stimer;
+
+	if (stimer && !is_sound_on) {
+		ch8_set_background();
 
 		is_sound_on = TRUE;
-	} else if (!global_state->sound_timer && is_sound_on) {
-		uint8_t saved[1024];
-
-		save_chip8_screen(saved);
-		memset(LCD_MEM, 0, LCD_SIZE);
-		restore_chip8_screen(saved);
+	} else if (!stimer && is_sound_on) {
+		ch8_clear_background();
 
 		is_sound_on = FALSE;
 	}
@@ -135,14 +133,13 @@ static const char *get_error_message(enum ch8_error err)
  */
 static void display_about(void)
 {
-	DlgMessage(
-		"About",
-		"chip8-ti68k v1.0\n"
-		"A (S)CHIP-8 emulator for ti68k graphing calculators.\n"
-		"\n"
-		"Copyright 2022 Peter Lafreniere\n"
-		"This is free software. See COPYING for more details.",
-		BT_NONE, BT_OK);
+	DlgMessage("About",
+		   "chip8-ti68k v1.0\n"
+		   "A (S)CHIP-8 emulator for ti68k graphing calculators.\n"
+		   "\n"
+		   "Copyright 2022 Peter Lafreniere\n"
+		   "This is free software. See COPYING for more details.",
+		   BT_NONE, BT_OK);
 }
 
 /* 
@@ -177,8 +174,8 @@ static uint16_t decompress(uint8_t *restrict dest, const uint8_t *restrict src,
 }
 
 /*
- * Initializes the saved screen, interrupts and the PRG, calling the main loop,
- * then restores previous state.
+ * Initializes the saved screen, interrupts and the PRG, greyscale, 
+ * calling the main loop, then restores previous state.
  * 
  * PRNG settings were found by trial and error with a handheld stopwatch.
  * (1, 241) = 62.5Hz, (0, 0) = 62.5Hz, and (1, 240) = 58.8Hz.
@@ -202,6 +199,15 @@ static enum ch8_error ch8_start(struct ch8_state *state)
 	LCD_save(HeapDeref(old_fb));
 
 	ClrScr();
+
+	old_int_1 = GetIntVec(AUTO_INT_1);
+	old_int_5 = GetIntVec(AUTO_INT_5);
+	SetIntVec(AUTO_INT_1, DUMMY_HANDLER);
+	SetIntVec(AUTO_INT_5, timer_update_interrupt);
+
+	if (!GrayOn())
+		return E_UNKNOWN_ERR;
+
 	if (state->from_state)
 		restore_chip8_screen(state->display);
 
@@ -215,21 +221,18 @@ static enum ch8_error ch8_start(struct ch8_state *state)
 	PRG_setRate(1);
 	PRG_setStart(240);
 
-	old_int_1 = GetIntVec(AUTO_INT_1);
-	SetIntVec(AUTO_INT_1, DUMMY_HANDLER);
-	old_int_5 = GetIntVec(AUTO_INT_5);
-	SetIntVec(AUTO_INT_5, timer_update_interrupt);
-
 	result = ch8_run(state);
-
-	SetIntVec(AUTO_INT_1, old_int_1);
-	SetIntVec(AUTO_INT_5, old_int_5);
 
 	PRG_setRate(old_prg_rate);
 	PRG_setStart(old_prg_start);
 
 	if (result == E_EXIT_SAVE)
 		save_chip8_screen(state->display);
+
+	GrayOff();
+
+	SetIntVec(AUTO_INT_1, old_int_1);
+	SetIntVec(AUTO_INT_5, old_int_5);
 
 	LCD_restore(HeapDeref(old_fb));
 
@@ -248,6 +251,7 @@ static enum ch8_error load_rom(const MULTI_EXPR *rom, struct ch8_state *state)
 	*state = (struct ch8_state){
 		.version = { MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION },
 		.stack = ch8_stack_new(),
+		.planes = C8_PLANE_BOTH,
 		.registers = { 0 },
 		.pc = 0x200,
 		.I = 0,

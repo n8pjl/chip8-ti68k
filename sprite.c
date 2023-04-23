@@ -16,20 +16,18 @@
 
 #include "chip8.h"
 #include <compat.h>
+#include <gray.h>
+#include <stdint.h>
 #include <string.h>
 
 /*
- * The main sprite drawing code. This function works perfectly, at a fast enough
- * speed for this project.
+ * The actual implementation of draw_sprite_16_hi. It is wrapped to abstract
+ * plane selection and switching.
  *
- * The tigcclib sprite code does not report when pixels are reset, otherwise
- * that would be a better option.
- *
- * Safety: can be called from interrupt context. Directly modifies lcd memory.
- * Do not use when the screen is redirected.
+ * See the wrapper for a better description of the function.
  */
-_Bool draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
-			uint8_t n)
+static _Bool _draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
+				uint8_t n, void *display)
 {
 	const uint8_t *sprite = (uint8_t *)sprite16;
 	uint16_t mask = UINT16_MAX;
@@ -57,11 +55,11 @@ _Bool draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
 			left_sprite[i] = (left_sprite[i] & ~mask) << shft;
 		}
 
-		ret = draw_sprite_16_hi(left_sprite, 0, y, n);
+		ret = _draw_sprite_16_hi(left_sprite, 0, y, n, display);
 	}
 
 	for (short i = 0; i < n; i++) {
-		ptr = LCD_MEM;
+		ptr = display;
 		ptr += ((y + i) % 64 + Y_BASE) * 30;
 		ptr += x / 8 & ~1;
 		line = *(uint32_t *)ptr;
@@ -76,20 +74,46 @@ _Bool draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
 }
 
 /*
+ * The main sprite drawing code. This function works perfectly, at a fast enough
+ * speed for this project.
+ *
+ * The tigcclib sprite code does not report when pixels are reset, otherwise
+ * that would be a better option.
+ *
+ * Safety: can be called from interrupt context. Directly modifies grayscale memory.
+ * Do not use when the screen is redirected.
+ */
+_Bool draw_sprite_16_hi(enum ch8_plane planes, const uint16_t *sprite16,
+			uint8_t x, uint8_t y, uint8_t n)
+{
+	_Bool ret = FALSE;
+
+	if (planes & C8_PLANE_LIGHT)
+		ret |= _draw_sprite_16_hi(sprite16, x, y, n,
+					  GrayGetPlane(LIGHT_PLANE));
+	if (planes & C8_PLANE_DARK)
+		ret |= _draw_sprite_16_hi(sprite16, x, y, n,
+					  GrayGetPlane(DARK_PLANE));
+
+	return ret;
+}
+
+/*
  * The same as draw_sprite_16_hi(), except it only loads sprites as 8 pixels
  * per line. This function is a shim to remove ~150 bytes from the resulting
  * binary.
  *
  * Safety: See draw_sprite_16_hi()
  */
-_Bool draw_sprite_8_hi(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n)
+_Bool draw_sprite_8_hi(enum ch8_plane planes, const uint8_t *sprite8, uint8_t x,
+		       uint8_t y, uint8_t n)
 {
 	uint16_t sprite16[n];
 
 	for (uint8_t i = 0; i < n; i++)
 		sprite16[i] = sprite8[i] << 8;
 
-	return draw_sprite_16_hi(sprite16, x, y, n);
+	return draw_sprite_16_hi(planes, sprite16, x, y, n);
 }
 
 /*
@@ -98,7 +122,8 @@ _Bool draw_sprite_8_hi(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n)
  * 
  * Safety: See draw_sprite_16()
  */
-_Bool draw_sprite_8_lo(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n)
+_Bool draw_sprite_8_lo(enum ch8_plane planes, const uint8_t *sprite8, uint8_t x,
+		       uint8_t y, uint8_t n)
 {
 	uint16_t sprite16[n * 2];
 	// Fastest option to zero a vla in c99
@@ -119,7 +144,7 @@ _Bool draw_sprite_8_lo(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n)
 		}
 	}
 
-	return draw_sprite_16_hi(sprite16, x, y, n * 2);
+	return draw_sprite_16_hi(planes, sprite16, x, y, n * 2);
 }
 
 /*
@@ -127,8 +152,8 @@ _Bool draw_sprite_8_lo(const uint8_t *sprite8, uint8_t x, uint8_t y, uint8_t n)
  * 
  * Safety: See draw_sprite_16()
  */
-_Bool draw_sprite_16_lo(const uint16_t *sprite16, uint8_t x, uint8_t y,
-			uint8_t n)
+_Bool draw_sprite_16_lo(enum ch8_plane planes, const uint16_t *sprite16,
+			uint8_t x, uint8_t y, uint8_t n)
 {
 	uint8_t sprite8_left[n];
 	uint8_t sprite8_right[n];
@@ -138,37 +163,57 @@ _Bool draw_sprite_16_lo(const uint16_t *sprite16, uint8_t x, uint8_t y,
 		sprite8_right[i] = ((uint8_t *)sprite16)[i * 2 + 1];
 	}
 
-	return draw_sprite_8_lo(sprite8_left, x, y, n) ||
-	       draw_sprite_8_lo(sprite8_right, x + 8, y, n);
+	return draw_sprite_8_lo(planes, sprite8_left, x, y, n) ||
+	       draw_sprite_8_lo(planes, sprite8_right, x + 8, y, n);
 }
 
 /*
  * There's no reason to save the entire screen when you can just save the 128x64
  * section that gets drawn to. This just wraps the actual copying.
+ *
+ * Copies both planes.
  */
-void save_chip8_screen(uint8_t dest[1024])
+void save_chip8_screen(uint8_t *dest)
 {
 	const uint8_t row_bytes = 128 / 8;
 
+	// Light plane
 	for (short i = 0; i < 64; i++)
-		memcpy(dest + i * row_bytes,
-		       LCD_MEM + (i + Y_BASE) * 30 + X_BASE / 8, row_bytes);
+		memcpy(&dest[0] + i * row_bytes,
+		       GrayGetPlane(LIGHT_PLANE) + (i + Y_BASE) * 30 +
+			       X_BASE / 8,
+		       row_bytes);
+
+	// Dark plane
+	for (short i = 0; i < 64; i++)
+		memcpy(&dest[1024] + i * row_bytes,
+		       GrayGetPlane(DARK_PLANE) + (i + Y_BASE) * 30 +
+			       X_BASE / 8,
+		       row_bytes);
 }
 
 /*
  * Reverses the above save_chip8_screen()
  */
-void restore_chip8_screen(const uint8_t src[1024])
+void restore_chip8_screen(const uint8_t *src)
 {
 	const uint8_t row_bytes = 128 / 8;
 
+	// Light plane
 	for (short i = 0; i < 64; i++)
-		memcpy(LCD_MEM + (i + Y_BASE) * 30 + X_BASE / 8,
-		       src + i * row_bytes, row_bytes);
+		memcpy(GrayGetPlane(LIGHT_PLANE) + (i + Y_BASE) * 30 +
+			       X_BASE / 8,
+		       &src[0] + i * row_bytes, row_bytes);
+
+	// Dark plane
+	for (short i = 0; i < 64; i++)
+		memcpy(GrayGetPlane(DARK_PLANE) + (i + Y_BASE) * 30 +
+			       X_BASE / 8,
+		       &src[1024] + i * row_bytes, row_bytes);
 }
 
-// 00FB = Scroll display right by 4 screen pixels.
-void ch8_scroll_right(void)
+// Wrapped by ch8_scroll_right()
+static void _ch8_scroll_right(void *lcd)
 {
 	uint8_t carry;
 	uint16_t *ptr;
@@ -177,7 +222,7 @@ void ch8_scroll_right(void)
 	for (short i = Y_BASE; i < Y_BASE + 64; i++) {
 		carry = 0;
 		for (short j = X_BASE / 8; j < (X_BASE + 128) / 8; j += 2) {
-			ptr = LCD_MEM + i * 30 + j;
+			ptr = lcd + i * 30 + j;
 			tmp = *ptr >> 4 | carry << 12;
 			carry = *ptr & 0xF;
 			*ptr = tmp;
@@ -185,8 +230,18 @@ void ch8_scroll_right(void)
 	}
 }
 
-// 00FC - Scroll display left by 4 screen pixels.
-void ch8_scroll_left(void)
+// 00FB = Scroll display right by 4 screen pixels.
+// Wrapper around _ch8_scroll_right()
+void ch8_scroll_right(enum ch8_plane planes)
+{
+	if (planes & C8_PLANE_LIGHT)
+		_ch8_scroll_right(GrayGetPlane(LIGHT_PLANE));
+	if (planes & C8_PLANE_DARK)
+		_ch8_scroll_right(GrayGetPlane(DARK_PLANE));
+}
+
+// Wrapped by ch8_scroll_left()
+static void _ch8_scroll_left(void *lcd)
 {
 	uint8_t carry;
 	uint16_t *ptr;
@@ -195,7 +250,7 @@ void ch8_scroll_left(void)
 	for (short i = Y_BASE; i < Y_BASE + 64; i++) {
 		carry = 0;
 		for (short j = (X_BASE + 128) / 8; j > X_BASE / 8; j -= 2) {
-			ptr = LCD_MEM + i * 30 + j;
+			ptr = lcd + i * 30 + j;
 			tmp = *ptr << 4 | carry;
 			carry = (*ptr & 0xF000) >> 12;
 			*ptr = tmp;
@@ -203,10 +258,53 @@ void ch8_scroll_left(void)
 	}
 }
 
-// 00Cn - Scroll display n screen pixels down.
-void ch8_scroll_down(uint16_t op)
+// 00FC - Scroll display left by 4 screen pixels.
+// Wrapper around _ch8_scroll_left()
+void ch8_scroll_left(enum ch8_plane planes)
 {
-	memmove(LCD_MEM + (Y_BASE + (op & 0xF)) * 30, LCD_MEM + Y_BASE * 30,
+	if (planes & C8_PLANE_LIGHT)
+		_ch8_scroll_left(GrayGetPlane(LIGHT_PLANE));
+	if (planes & C8_PLANE_DARK)
+		_ch8_scroll_left(GrayGetPlane(DARK_PLANE));
+}
+
+// Wrapped by ch8_scroll_down()
+static void _ch8_scroll_down(void *lcd, uint16_t op)
+{
+	memmove(lcd + (Y_BASE + (op & 0xF)) * 30, lcd + Y_BASE * 30,
 		30 * (63 - (op & 0xF)));
-	memset(LCD_MEM + Y_BASE * 30, 0, 30 * (op & 0xF));
+	memset(lcd + Y_BASE * 30, 0, 30 * (op & 0xF));
+}
+
+// 00Cn - Scroll display n screen pixels down.
+// Wrapper around _ch8_scroll_down()
+void ch8_scroll_down(enum ch8_plane planes, uint16_t op)
+{
+	if (planes & C8_PLANE_LIGHT)
+		_ch8_scroll_down(GrayGetPlane(LIGHT_PLANE), op);
+	if (planes & C8_PLANE_DARK)
+		_ch8_scroll_down(GrayGetPlane(DARK_PLANE), op);
+}
+
+static void _ch8_set_background(void *plane, short val)
+{
+	memset(plane, val, Y_BASE * 30);
+	for (short i = 0; i < 64; i++) {
+		memset(plane + Y_BASE * 30 + 30 * i, val, X_BASE / 8);
+		memset(plane + Y_BASE * 30 + 30 * i + 128 / 8 + 2, val, 2);
+	}
+	memset(plane + Y_BASE * 30 + 30 * 64, val,
+	       (LCD_HEIGHT - Y_BASE - 64) * 30);
+}
+
+void ch8_clear_background(void)
+{
+	//_ch8_set_background(GrayGetPlane(LIGHT_PLANE), 0);
+	_ch8_set_background(GrayGetPlane(DARK_PLANE), 0);
+}
+
+void ch8_set_background(void)
+{
+	//_ch8_set_background(GrayGetPlane(LIGHT_PLANE), -1);
+	_ch8_set_background(GrayGetPlane(DARK_PLANE), -1);
 }

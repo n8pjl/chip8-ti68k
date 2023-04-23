@@ -16,6 +16,8 @@
 
 #include "chip8.h"
 #include <compat.h>
+#include <graph.h>
+#include <gray.h>
 #include <kbd.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -189,9 +191,13 @@ static inline uint8_t last(uint16_t x)
 	static enum ch8_error x(struct ch8_state *state, uint16_t op)
 
 // 00E0 - Clear screen
-static enum ch8_error ch8_clear(void)
+static enum ch8_error ch8_clear(enum ch8_plane planes)
 {
-	memset(LCD_MEM, 0, LCD_SIZE);
+	if (planes & C8_PLANE_LIGHT)
+		memset(GrayGetPlane(LIGHT_PLANE), 0, LCD_SIZE);
+	if (planes & C8_PLANE_DARK)
+		memset(GrayGetPlane(DARK_PLANE), 0, LCD_SIZE);
+
 	return E_OK;
 }
 
@@ -423,16 +429,20 @@ OPCODE_HANDLER(ch8_draw)
 	if (state->is_hires_on) {
 		if (!last(op))
 			result = draw_sprite_16_hi(
-				(void *)state->memory + state->I, x, y, 16);
+				state->planes, (void *)state->memory + state->I,
+				x, y, 16);
 		else
-			result = draw_sprite_8_hi(state->memory + state->I, x,
+			result = draw_sprite_8_hi(state->planes,
+						  state->memory + state->I, x,
 						  y, last(op));
 	} else {
 		if (!last(op))
 			result = draw_sprite_16_lo(
-				(void *)state->memory + state->I, x, y, 16);
+				state->planes, (void *)state->memory + state->I,
+				x, y, 16);
 		else
-			result = draw_sprite_8_lo(state->memory + state->I, x,
+			result = draw_sprite_8_lo(state->planes,
+						  state->memory + state->I, x,
 						  y, last(op));
 	}
 
@@ -625,13 +635,13 @@ static enum ch8_error ch8_dispatch_0(struct ch8_state *state, uint16_t op)
 
 	switch (third(op)) {
 	case 0xC:
-		ch8_scroll_down(op);
+		ch8_scroll_down(state->planes, op);
 		return E_OK;
 	case 0xE:
 
 		switch (last(op)) {
 		case 0x0:
-			return ch8_clear();
+			return ch8_clear(state->planes);
 		case 0xE:
 			return ch8_ret(state);
 		}
@@ -640,10 +650,10 @@ static enum ch8_error ch8_dispatch_0(struct ch8_state *state, uint16_t op)
 
 		switch (last(op)) {
 		case 0xB:
-			ch8_scroll_right();
+			ch8_scroll_right(state->planes);
 			return E_OK;
 		case 0xC:
-			ch8_scroll_left();
+			ch8_scroll_left(state->planes);
 			return E_OK;
 		case 0xD:
 			return ch8_quit();
