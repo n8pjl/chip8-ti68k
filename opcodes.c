@@ -738,6 +738,12 @@ static enum ch8_error ch8_dispatch_f(struct ch8_state *state, uint16_t op)
 		switch (last(op)) {
 		case 0x1:
 			return ch8_set_draw_target(state, op);
+		case 0x2:
+			if (!second(op))
+				// f002 - Set buzzer tone. Nop on calculator (XO-CHIP)
+				return E_OK;
+			else
+				return E_INVALID_OPCODE;
 		case 0x7:
 			return ch8_read_timer(state, op);
 		case 0xA:
@@ -767,6 +773,9 @@ static enum ch8_error ch8_dispatch_f(struct ch8_state *state, uint16_t op)
 			return ch8_font_big(state, op);
 		case 0x3:
 			return ch8_bcd(state, op);
+		case 0xA:
+			// fx3a - Set pitch = x. Nop on calculator (XO-CHIP)
+			return E_OK;
 		default:
 			return E_INVALID_OPCODE;
 		}
