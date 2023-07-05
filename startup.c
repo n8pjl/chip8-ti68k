@@ -137,7 +137,7 @@ static void display_about(void)
 		   "chip8-ti68k v1.0\n"
 		   "A (S)CHIP-8 emulator for ti68k graphing calculators.\n"
 		   "\n"
-		   "Copyright 2022 Peter Lafreniere\n"
+		   "Copyright 2022-2023 Peter Lafreniere\n"
 		   "This is free software. See COPYING for more details.",
 		   BT_NONE, BT_OK);
 }
