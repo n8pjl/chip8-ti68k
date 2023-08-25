@@ -44,7 +44,7 @@ static _Bool _draw_sprite_16_hi(const uint16_t *sprite16, uint8_t x, uint8_t y,
 
 	shft = 16 - (x % 16);
 
-	if (x + 16 >= 128 + X_BASE) {
+	if (x >= 128 + X_BASE - 16) {
 		mask = UINT32_MAX << (uint32_t)(x % 16);
 
 		// Recurse to draw the overshoot. Can only happen once per call.
@@ -219,9 +219,9 @@ static void _ch8_scroll_right(void *lcd)
 	uint16_t *ptr;
 	uint16_t tmp;
 
-	for (short i = Y_BASE; i < Y_BASE + 64; i++) {
+	for (uint_fast8_t i = Y_BASE; i < Y_BASE + 64; i++) {
 		carry = 0;
-		for (short j = X_BASE / 8; j < (X_BASE + 128) / 8; j += 2) {
+		for (uint16_t j = X_BASE / 8; j < (X_BASE + 128) / 8; j += 2) {
 			ptr = lcd + i * 30 + j;
 			tmp = *ptr >> 4 | carry << 12;
 			carry = *ptr & 0xF;
@@ -247,9 +247,10 @@ static void _ch8_scroll_left(void *lcd)
 	uint16_t *ptr;
 	uint16_t tmp;
 
-	for (short i = Y_BASE; i < Y_BASE + 64; i++) {
+	for (uint_fast8_t i = Y_BASE; i < Y_BASE + 64; i++) {
 		carry = 0;
-		for (short j = (X_BASE + 128) / 8; j > X_BASE / 8; j -= 2) {
+		for (uint_fast8_t j = (X_BASE + 128) / 8; j > X_BASE / 8;
+		     j -= 2) {
 			ptr = lcd + i * 30 + j;
 			tmp = *ptr << 4 | carry;
 			carry = (*ptr & 0xF000) >> 12;
@@ -273,7 +274,7 @@ static void _ch8_scroll_down(void *lcd, uint8_t n)
 {
 	memmove(lcd + (Y_BASE + n) * 30, lcd + Y_BASE * 30, 30 * (63 - n));
 
-	for (short i = Y_BASE; i < Y_BASE + n; i++)
+	for (uint8_t i = Y_BASE; i < Y_BASE + n; i++)
 		memset(lcd + i * 30 + X_BASE / 8, 0, 16);
 }
 
@@ -292,7 +293,7 @@ static void _ch8_scroll_up(void *lcd, uint8_t n)
 {
 	memmove(lcd + Y_BASE * 30, lcd + (Y_BASE + n) * 30, 30 * (63 - n));
 
-	for (short i = Y_BASE + (63 - n); i < Y_BASE + 64; i++)
+	for (uint_fast8_t i = Y_BASE + (63 - n); i < Y_BASE + 64; i++)
 		memset(lcd + i * 30 + X_BASE / 8, 0, 16);
 }
 
