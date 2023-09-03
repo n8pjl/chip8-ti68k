@@ -40,7 +40,7 @@
 #define STRINGIFY_VERSION2(a, b, c) #a"."#b"."#c
 #endif
 
-#define STRINGIFY_VERSION(a, b, c) STRINGIFY_VERSION2(a, b, c)
+#define STRINGIFY_VERSION(a, b, c) "v"STRINGIFY_VERSION2(a, b, c)
 
 // For use in displaying the usage.
 #define VERSION_STRING STRINGIFY_VERSION(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION)

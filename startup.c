@@ -132,7 +132,7 @@ static const char *get_error_message(enum ch8_error err)
 static void display_about(void)
 {
 	DlgMessage("About",
-		   "chip8-ti68k v"VERSION_STRING"\n"
+		   "chip8-ti68k "VERSION_STRING"\n"
 		   "A (S)CHIP-8 emulator for ti68k graphing calculators.\n"
 		   "\n"
 		   "Copyright 2022-2023 Peter Lafreniere\n"
