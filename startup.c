@@ -127,14 +127,12 @@ static const char *get_error_message(enum ch8_error err)
 }
 
 /*
- * Do not forget to update this message when the release version changes.
- *
  * Safety: can trigger heap compression.
  */
 static void display_about(void)
 {
 	DlgMessage("About",
-		   "chip8-ti68k v1.0\n"
+		   "chip8-ti68k v"VERSION_STRING"\n"
 		   "A (S)CHIP-8 emulator for ti68k graphing calculators.\n"
 		   "\n"
 		   "Copyright 2022-2023 Peter Lafreniere\n"

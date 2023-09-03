@@ -34,6 +34,17 @@
 // The patch version is used for bug fixes that do not change compatiblity.
 #define PATCH_VERSION 0
 
+#if PATCH_VERSION == 0
+#define STRINGIFY_VERSION2(a, b, c) #a"."#b
+#else
+#define STRINGIFY_VERSION2(a, b, c) #a"."#b"."#c
+#endif
+
+#define STRINGIFY_VERSION(a, b, c) STRINGIFY_VERSION2(a, b, c)
+
+// For use in displaying the usage.
+#define VERSION_STRING STRINGIFY_VERSION(MAJOR_VERSION, MINOR_VERSION, PATCH_VERSION)
+
 enum ch8_error {
 	E_OK,
 	E_EXIT_SAVE,
