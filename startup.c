@@ -1,4 +1,4 @@
-/* Copyright (C) 2022-2023 Peter Lafreniere
+/* Copyright (C) 2022-2024 Peter Lafreniere
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -135,7 +135,7 @@ static void display_about(void)
 		   "chip8-ti68k "VERSION_STRING"\n"
 		   "A (S)CHIP-8 emulator for ti68k graphing calculators.\n"
 		   "\n"
-		   "Copyright 2022-2023 Peter Lafreniere\n"
+		   "Copyright 2022-2024 Peter Lafreniere\n"
 		   "This is free software. See COPYING for more details.",
 		   BT_NONE, BT_OK);
 }
