@@ -13,8 +13,7 @@ Introduction:
 Have you ever wanted to play games on your calculator? Of course you have.
 You don't have to lie.
 
-How about CHIP-8 games? If you've never heard about CHIP-8, then you're not
-alone.
+How about CHIP-8 games? If you've never heard of CHIP-8, then you're not alone.
 
 CHIP-8 is a format of retro game roms that are particularly well-suited to
 running on graphing calculators. Over time, there has been a huge amount of
@@ -29,8 +28,8 @@ Usage:
 ¯¯¯¯¯
 First, you need CHIP-8 roms. They can be found easily with the use of your
 preferred internet search engine. Unlike roms for true consoles, these roms
-are perfectly legal to distribute online. I suggest starting by looking at the
-roms available at <https://github.com/JohnEarnest/chip8Archive>.
+tend to be perfectly legal to distribute online. I suggest starting by looking
+at the roms available at <https://github.com/JohnEarnest/chip8Archive>.
 
 Preprocessor
 ¯¯¯¯¯¯¯¯¯¯¯¯
