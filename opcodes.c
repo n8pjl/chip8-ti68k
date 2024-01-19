@@ -15,7 +15,9 @@
  */
 
 #include "chip8.h"
+
 #include <compat.h>
+#include <error.h>
 #include <graph.h>
 #include <gray.h>
 #include <kbd.h>
@@ -36,29 +38,29 @@ struct ch8_stack ch8_stack_new(void)
 }
 
 /*
- * Pushes a new value onto the stack. Returns E_STACK_OVERFLOW if the stack
- * is full, otherwise E_OK.
+ * Pushes a new value onto the stack.
+ *
+ * Throws E_STACK_OVERFLOW if the stack is full.
  */
-static enum ch8_error ch8_stack_push(struct ch8_stack *stack, uint16_t x)
+static void ch8_stack_push(struct ch8_stack *stack, uint16_t x)
 {
 	if (stack->sp == C8_STACK_CAPACITY)
-		return E_STACK_OVERFLOW;
+		ER_throw(E_STACK_OVERFLOW);
 	else
 		stack->stack[stack->sp++] = x;
-	return E_OK;
 }
 
 /*
- * Pops a value off the stack. Returns E_STACK_UNDERFLOW if the stack is
- * empty, otherwise E_OK. The popped value is returned in x.
-*/
-static enum ch8_error ch8_stack_pop(struct ch8_stack *stack, uint16_t *x)
+ * Pops a value off the stack.
+ *
+ * Throws E_STACK_UNDERFLOW if the stack is empty.
+ */
+static uint16_t ch8_stack_pop(struct ch8_stack *stack)
 {
 	if (stack->sp == 0)
-		return E_STACK_UNDERFLOW;
+		ER_throw(E_STACK_UNDERFLOW);
 	else
-		*x = stack->stack[--stack->sp];
-	return E_OK;
+		return stack->stack[--stack->sp];
 }
 
 /*
@@ -187,61 +189,52 @@ static inline uint8_t last(uint16_t x)
 //
 //////////////////////////////////////////////////////////////////////////////
 
-#define OPCODE_HANDLER(x) \
-	static enum ch8_error x(struct ch8_state *state, uint16_t op)
+#define OPCODE_HANDLER(x) static void x(struct ch8_state *state, uint16_t op)
 
 // 00E0 - Clear screen
-static enum ch8_error ch8_clear(enum ch8_plane planes)
+static void ch8_clear(enum ch8_plane planes)
 {
 	if (planes & C8_PLANE_LIGHT)
 		memset(GrayGetPlane(LIGHT_PLANE), 0, LCD_SIZE);
 	if (planes & C8_PLANE_DARK)
 		memset(GrayGetPlane(DARK_PLANE), 0, LCD_SIZE);
-
-	return E_OK;
 }
 
 // 00EE - Return from subroutine
-static enum ch8_error ch8_ret(struct ch8_state *state)
+static void ch8_ret(struct ch8_state *state)
 {
-	enum ch8_error ret;
-	ret = ch8_stack_pop(&state->stack, &state->pc);
-	return ret;
+	state->pc = ch8_stack_pop(&state->stack);
 }
 
 // 00FD - Exit Interpreter
-static enum ch8_error ch8_quit(void)
+static void ch8_quit(void)
 {
-	return E_SILENT_EXIT;
+	ER_throw(E_SILENT_EXIT);
 }
 
 // 00FE - Disable hi-res mode
-static enum ch8_error ch8_exit_hires(struct ch8_state *state)
+static void ch8_exit_hires(struct ch8_state *state)
 {
 	state->is_hires_on = FALSE;
-	return E_OK;
 }
 
 // 00FF - Enable hi-res mode
-static enum ch8_error ch8_enter_hires(struct ch8_state *state)
+static void ch8_enter_hires(struct ch8_state *state)
 {
 	state->is_hires_on = TRUE;
-	return E_OK;
 }
 
 // 1nnn - Jump to location nnn
 OPCODE_HANDLER(ch8_jump)
 {
 	state->pc = op & 0xFFF;
-	return E_OK;
 }
 
 // 2nnn - Call subroutine at nnn
 OPCODE_HANDLER(ch8_call)
 {
-	enum ch8_error err = ch8_stack_push(&state->stack, state->pc);
+	ch8_stack_push(&state->stack, state->pc);
 	state->pc = op & 0xFFF;
-	return err;
 }
 
 // 3xnn - Skip the next instruction if Vx = nn
@@ -249,7 +242,6 @@ OPCODE_HANDLER(ch8_skip_eq)
 {
 	if (state->registers[second(op)] == (op & 0xFF))
 		state->pc += 2;
-	return E_OK;
 }
 
 // 4xnn - Skip the next instruction if Vx != nn
@@ -257,18 +249,16 @@ OPCODE_HANDLER(ch8_skip_neq)
 {
 	if (state->registers[second(op)] != (op & 0xFF))
 		state->pc += 2;
-	return E_OK;
 }
 
 // 5xy0 - Skip the next instruction if Vx = Vy
 OPCODE_HANDLER(ch8_skip_reg_eq)
 {
 	if (last(op) != 0)
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 
 	if (state->registers[second(op)] == state->registers[third(op)])
 		state->pc += 2;
-	return E_OK;
 }
 
 // 5xy2 - Store Vx to Vy at I to I+(y-x). Do not update I (xo-chip)
@@ -276,7 +266,6 @@ OPCODE_HANDLER(ch8_store_xo)
 {
 	for (short i = second(op); i <= third(op); i++)
 		state->memory[(state->I + i) & 0xFFF] = state->registers[i];
-	return E_OK;
 }
 
 // 5xy3 - Load Vx to Vy from I to I+(y-x). Do not update I (xo-chip)
@@ -284,49 +273,42 @@ OPCODE_HANDLER(ch8_load_xo)
 {
 	for (short i = second(op); i <= third(op); i++)
 		state->registers[i] = state->memory[(state->I + i) & 0xFFF];
-	return E_OK;
 }
 
 // 6xnn - Set Vx = nn
 OPCODE_HANDLER(ch8_set_imm)
 {
 	state->registers[second(op)] = op & 0xFF;
-	return E_OK;
 }
 
 // 7xnn - Set Vx = Vx + nn
 OPCODE_HANDLER(ch8_add_imm)
 {
 	state->registers[second(op)] += op & 0xFF;
-	return E_OK;
 }
 
 // 8xy0 - Set Vx = Vy
 OPCODE_HANDLER(ch8_mov)
 {
 	state->registers[second(op)] = state->registers[third(op)];
-	return E_OK;
 }
 
 // 8xy1 - Set Vx |= Vy
 OPCODE_HANDLER(ch8_or)
 {
 	state->registers[second(op)] |= state->registers[third(op)];
-	return E_OK;
 }
 
 // 8xy2 - Set Vx &= Vy
 OPCODE_HANDLER(ch8_and)
 {
 	state->registers[second(op)] &= state->registers[third(op)];
-	return E_OK;
 }
 
 // 8xy3 - Set Vx ^= Vy
 OPCODE_HANDLER(ch8_xor)
 {
 	state->registers[second(op)] ^= state->registers[third(op)];
-	return E_OK;
 }
 
 // 8xy4 - Set Vx += Vy, VF to !carry
@@ -337,8 +319,6 @@ OPCODE_HANDLER(ch8_add)
 
 	state->registers[second(op)] += y;
 	state->registers[0xF] = (x + y) & ~UINT8_MAX ? 1 : 0;
-
-	return E_OK;
 }
 
 // 8xy5 - Set Vx -= Vy, VF to !borrow
@@ -349,8 +329,6 @@ OPCODE_HANDLER(ch8_sub_5)
 
 	state->registers[second(op)] -= y;
 	state->registers[0xF] = y > x ? 0 : 1;
-
-	return E_OK;
 }
 
 // 8xy6 - Set Vx = Vy >> 1, VF to carry
@@ -360,8 +338,6 @@ OPCODE_HANDLER(ch8_lsr)
 
 	state->registers[second(op)] = y >> 1;
 	state->registers[0xF] = y & 1;
-
-	return E_OK;
 }
 
 // 8xy7 - Set Vx = Vy - Vx, VF to !borrow
@@ -372,8 +348,6 @@ OPCODE_HANDLER(ch8_sub_7)
 
 	state->registers[second(op)] = y - x;
 	state->registers[0xF] = x > y ? 0 : 1;
-
-	return E_OK;
 }
 
 // 8xyE - Set Vx = Vy << 1, VF to carry
@@ -383,40 +357,34 @@ OPCODE_HANDLER(ch8_lsl)
 
 	state->registers[second(op)] = y << 1;
 	state->registers[0xF] = (y & 0x80) >> 7;
-
-	return E_OK;
 }
 
 // 9xy0 - Skip the next instruction if Vx != Vy
 OPCODE_HANDLER(ch8_skip_reg_neq)
 {
 	if (last(op) != 0)
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 
 	if (state->registers[second(op)] != state->registers[third(op)])
 		state->pc += 2;
-	return E_OK;
 }
 
 // annn - Set I = nnn
 OPCODE_HANDLER(ch8_load_ptr)
 {
 	state->I = op & 0xFFF;
-	return E_OK;
 }
 
 // bnnn - Jump to nnn + V0
 OPCODE_HANDLER(ch8_jump_reg)
 {
 	state->pc = ((op & 0xFFF) + state->registers[0]) & 0xFFF;
-	return E_OK;
 }
 
 // cxnn - Set Vx = random number AND nn
 OPCODE_HANDLER(ch8_rand)
 {
 	state->registers[second(op)] = rand() & op & 0xFF;
-	return E_OK;
 }
 
 // dxyn - Draw sprite
@@ -447,7 +415,6 @@ OPCODE_HANDLER(ch8_draw)
 	}
 
 	state->registers[0xF] = result;
-	return E_OK;
 }
 
 /*
@@ -461,14 +428,12 @@ OPCODE_HANDLER(ch8_key_set)
 	uint8_t key = state->registers[second(op)];
 
 	if (key >= 16)
-		goto exit;
+		return;
 
 	read_keyboard(board);
 
 	if (board[key])
 		state->pc += 2;
-exit:
-	return E_OK;
 }
 
 /*
@@ -484,7 +449,6 @@ OPCODE_HANDLER(ch8_key_unset)
 
 	if ((key < 16 && !board[key]) || key >= 16)
 		state->pc += 2;
-	return E_OK;
 }
 
 // fn01 - Set planes active = n, with 1 = light and 2 = dark. (XO-CHIP)
@@ -492,17 +456,15 @@ OPCODE_HANDLER(ch8_key_unset)
 OPCODE_HANDLER(ch8_set_draw_target)
 {
 	if (second(op) > 3)
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 
 	state->planes = second(op);
-	return E_OK;
 }
 
 // fx07 - Set Vx = delay timer
 OPCODE_HANDLER(ch8_read_timer)
 {
 	state->registers[second(op)] = state->delay_timer;
-	return E_OK;
 }
 
 // fx0a - Set Vx = next pressed key (blocking)
@@ -518,15 +480,15 @@ OPCODE_HANDLER(ch8_key_wait)
 
 		// TODO handle other keys.
 		if (new_row[16])
-			return E_SILENT_EXIT;
+			ER_throw(E_SILENT_EXIT);
 		if (new_row[17])
-			return E_EXIT_SAVE;
+			ER_throw(E_EXIT_SAVE);
 
 		for (uint8_t i = 0; i < 16; i++) {
 			// Only evaluates to true on falling edge.
 			if (old_row[i] && !new_row[i]) {
 				state->registers[second(op)] = i;
-				return E_OK;
+				return;
 			}
 		}
 
@@ -538,14 +500,12 @@ OPCODE_HANDLER(ch8_key_wait)
 OPCODE_HANDLER(ch8_set_timer)
 {
 	state->delay_timer = state->registers[second(op)];
-	return E_OK;
 }
 
 // fx18 - Set sound timer = Vx
 OPCODE_HANDLER(ch8_set_sound)
 {
 	state->sound_timer = state->registers[second(op)];
-	return E_OK;
 }
 
 // fx1e - Set I += Vx
@@ -555,17 +515,14 @@ OPCODE_HANDLER(ch8_add_ptr)
 
 	state->registers[0xF] = state->I & ~0xFFF ? 1 : 0;
 	state->I &= 0xFFF;
-
-	return E_OK;
 }
 
 // fx29 - Set I = address of hex digit stored in Vx
 OPCODE_HANDLER(ch8_font)
 {
 	if (state->registers[second(op)] > 0xF)
-		return E_INVALID_OPCODE; // Maybe a different error code?
+		ER_throw(E_INVALID_OPCODE); // Maybe a different error code?
 	state->I = state->registers[second(op)] * 5;
-	return E_OK;
 }
 
 // fx30 - Set I = address of hex digit stored in Vx (S-CHIP/Octo)
@@ -573,9 +530,8 @@ OPCODE_HANDLER(ch8_font_big)
 {
 	// Note that hex digits A-F are an Octo-specific extension
 	if (state->registers[second(op)] > 0xF)
-		return E_INVALID_OPCODE; // See ch8_font()
+		ER_throw(E_INVALID_OPCODE); // See ch8_font()
 	state->I = state->registers[second(op)] * 10 + 80;
-	return E_OK;
 }
 
 // fx33 - Set (I,I+1,I+2) = (100s, 10s, 1s) digits. (BCD routine)
@@ -587,7 +543,6 @@ OPCODE_HANDLER(ch8_bcd)
 		state->memory[(state->I + j) & 0xFFF] = num % 10;
 		num /= 10;
 	}
-	return E_OK;
 }
 
 // fx55 - Store V0 to Vx at I to I+x. Set I += x + 1
@@ -597,7 +552,6 @@ OPCODE_HANDLER(ch8_store)
 		state->memory[(state->I + j) & 0xFFF] = state->registers[j];
 
 	state->I = (state->I + second(op) + 1) & 0xFFF;
-	return E_OK;
 }
 
 // fx65 - Load V0 to Vx from I to I+x. Set I += x + 1
@@ -607,7 +561,6 @@ OPCODE_HANDLER(ch8_load)
 		state->registers[j] = state->memory[(state->I + j) & 0xFFF];
 
 	state->I = (state->I + second(op) + 1) & 0xFFF;
-	return E_OK;
 }
 
 // fx75 - Store V0 to Vx in rpl persistent storage
@@ -617,8 +570,6 @@ OPCODE_HANDLER(ch8_rpl_store)
 {
 	for (short i = 0; i <= second(op); i++)
 		state->rpl_fake[i] = state->registers[i];
-
-	return E_OK;
 }
 
 // fx85 - Load V0 to Vx from rpl persistent storage
@@ -627,8 +578,6 @@ OPCODE_HANDLER(ch8_rpl_load)
 {
 	for (short i = 0; i <= second(op); i++)
 		state->registers[i] = state->rpl_fake[i];
-
-	return E_OK;
 }
 
 #undef OPCODE_HANDLER
@@ -639,25 +588,27 @@ OPCODE_HANDLER(ch8_rpl_load)
 //
 //////////////////////////////////////////////////////////////////////////////
 
-static enum ch8_error ch8_dispatch_0(struct ch8_state *state, uint16_t op)
+static void ch8_dispatch_0(struct ch8_state *state, uint16_t op)
 {
 	if (second(op) != 0)
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 
 	switch (third(op)) {
 	case 0xC:
 		ch8_scroll_down(state->planes, op);
-		return E_OK;
+		return;
 	case 0xD:
 		ch8_scroll_up(state->planes, op);
-		return E_OK;
+		return;
 	case 0xE:
 
 		switch (last(op)) {
 		case 0x0:
-			return ch8_clear(state->planes);
+			ch8_clear(state->planes);
+			return;
 		case 0xE:
-			return ch8_ret(state);
+			ch8_ret(state);
+			return;
 		}
 		break;
 	case 0xF:
@@ -665,142 +616,175 @@ static enum ch8_error ch8_dispatch_0(struct ch8_state *state, uint16_t op)
 		switch (last(op)) {
 		case 0xB:
 			ch8_scroll_right(state->planes);
-			return E_OK;
+			return;
 		case 0xC:
 			ch8_scroll_left(state->planes);
-			return E_OK;
+			return;
 		case 0xD:
-			return ch8_quit();
+			ch8_quit();
+			return;
 		case 0xE:
-			return ch8_exit_hires(state);
+			ch8_exit_hires(state);
+			return;
 		case 0xF:
-			return ch8_enter_hires(state);
+			ch8_enter_hires(state);
+			return;
 		}
 		break;
 	}
-	return E_INVALID_OPCODE;
+	ER_throw(E_INVALID_OPCODE);
 }
 
-static enum ch8_error ch8_dispatch_5(struct ch8_state *state, uint16_t op)
+static void ch8_dispatch_5(struct ch8_state *state, uint16_t op)
 {
 	switch (last(op)) {
 	case 0x0:
-		return ch8_skip_reg_eq(state, op);
+		ch8_skip_reg_eq(state, op);
+		break;
 	case 0x2:
-		return ch8_store_xo(state, op);
+		ch8_store_xo(state, op);
+		break;
 	case 0x3:
-		return ch8_load_xo(state, op);
+		ch8_load_xo(state, op);
+		break;
 	default:
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 	}
 }
 
-static enum ch8_error ch8_dispatch_8(struct ch8_state *state, uint16_t op)
+static void ch8_dispatch_8(struct ch8_state *state, uint16_t op)
 {
 	switch (last(op)) {
 	case 0x0:
-		return ch8_mov(state, op);
+		ch8_mov(state, op);
+		break;
 	case 0x1:
-		return ch8_or(state, op);
+		ch8_or(state, op);
+		break;
 	case 0x2:
-		return ch8_and(state, op);
+		ch8_and(state, op);
+		break;
 	case 0x3:
-		return ch8_xor(state, op);
+		ch8_xor(state, op);
+		break;
 	case 0x4:
-		return ch8_add(state, op);
+		ch8_add(state, op);
+		break;
 	case 0x5:
-		return ch8_sub_5(state, op);
+		ch8_sub_5(state, op);
+		break;
 	case 0x6:
-		return ch8_lsr(state, op);
+		ch8_lsr(state, op);
+		break;
 	case 0x7:
-		return ch8_sub_7(state, op);
+		ch8_sub_7(state, op);
+		break;
 	case 0xE:
-		return ch8_lsl(state, op);
+		ch8_lsl(state, op);
+		break;
 	default:
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 	}
 }
 
-static enum ch8_error ch8_dispatch_e(struct ch8_state *state, uint16_t op)
+static void ch8_dispatch_e(struct ch8_state *state, uint16_t op)
 {
 	if ((op & 0xFF) == 0x9E)
-		return ch8_key_set(state, op);
+		ch8_key_set(state, op);
 	else if ((op & 0xFF) == 0xA1)
-		return ch8_key_unset(state, op);
+		ch8_key_unset(state, op);
 	else
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 }
 
-static enum ch8_error ch8_dispatch_f(struct ch8_state *state, uint16_t op)
+static void ch8_dispatch_f(struct ch8_state *state, uint16_t op)
 {
 	switch (third(op)) {
 	case 0x0:
 		switch (last(op)) {
 		case 0x1:
-			return ch8_set_draw_target(state, op);
+			ch8_set_draw_target(state, op);
+			return;
 		case 0x2:
 			if (!second(op))
 				// f002 - Set buzzer tone. Nop on calculator (XO-CHIP)
-				return E_OK;
+				return;
 			else
-				return E_INVALID_OPCODE;
+				ER_throw(E_INVALID_OPCODE);
 		case 0x7:
-			return ch8_read_timer(state, op);
+			ch8_read_timer(state, op);
+			return;
 		case 0xA:
-			return ch8_key_wait(state, op);
+			ch8_key_wait(state, op);
+			return;
 		default:
-			return E_INVALID_OPCODE;
+			ER_throw(E_INVALID_OPCODE);
 		}
 	case 0x1:
 		switch (last(op)) {
 		case 0x5:
-			return ch8_set_timer(state, op);
+			ch8_set_timer(state, op);
+			return;
 		case 0x8:
-			return ch8_set_sound(state, op);
+			ch8_set_sound(state, op);
+			return;
 		case 0xE:
-			return ch8_add_ptr(state, op);
+			ch8_add_ptr(state, op);
+			return;
 		default:
-			return E_INVALID_OPCODE;
+			ER_throw(E_INVALID_OPCODE);
 		}
 	case 0x2:
-		if (last(op) == 0x9)
-			return ch8_font(state, op);
-		else
-			return E_INVALID_OPCODE;
+		if (last(op) == 0x9) {
+			ch8_font(state, op);
+			return;
+		} else {
+			ER_throw(E_INVALID_OPCODE);
+		}
 	case 0x3:
 		switch (last(op)) {
 		case 0x0:
-			return ch8_font_big(state, op);
+			ch8_font_big(state, op);
+			return;
 		case 0x3:
-			return ch8_bcd(state, op);
+			ch8_bcd(state, op);
+			return;
 		case 0xA:
 			// fx3a - Set pitch = x. Nop on calculator (XO-CHIP)
-			return E_OK;
+			return;
 		default:
-			return E_INVALID_OPCODE;
+			ER_throw(E_INVALID_OPCODE);
 		}
 	case 0x5:
-		if (last(op) == 0x5)
-			return ch8_store(state, op);
-		else
-			return E_INVALID_OPCODE;
+		if (last(op) == 0x5) {
+			ch8_store(state, op);
+			return;
+		} else {
+			ER_throw(E_INVALID_OPCODE);
+		}
 	case 0x6:
-		if (last(op) == 0x5)
-			return ch8_load(state, op);
-		else
-			return E_INVALID_OPCODE;
+		if (last(op) == 0x5) {
+			ch8_load(state, op);
+			return;
+		} else {
+			ER_throw(E_INVALID_OPCODE);
+		}
 	case 0x7:
-		if (last(op) == 0x5)
-			return ch8_rpl_store(state, op);
-		else
-			return E_INVALID_OPCODE;
+		if (last(op) == 0x5) {
+			ch8_rpl_store(state, op);
+			return;
+		} else {
+			ER_throw(E_INVALID_OPCODE);
+		}
 	case 0x8:
-		if (last(op) == 0x5)
-			return ch8_rpl_load(state, op);
-		else
-			return E_INVALID_OPCODE;
+		if (last(op) == 0x5) {
+			ch8_rpl_load(state, op);
+			return;
+		} else {
+			ER_throw(E_INVALID_OPCODE);
+		}
 	default:
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 	}
 }
 
@@ -814,43 +798,59 @@ static enum ch8_error ch8_dispatch_f(struct ch8_state *state, uint16_t op)
  * Performs dispatching of opcodes to their corresponding handlers. Function
  * pointers are *not* used because they block inlining by the compiler.
  */
-static enum ch8_error ch8_dispatch(struct ch8_state *state, uint16_t opcode)
+static void ch8_dispatch(struct ch8_state *state, uint16_t opcode)
 {
 	switch (first(opcode)) {
 	case 0x0:
-		return ch8_dispatch_0(state, opcode);
+		ch8_dispatch_0(state, opcode);
+		break;
 	case 0x1:
-		return ch8_jump(state, opcode);
+		ch8_jump(state, opcode);
+		break;
 	case 0x2:
-		return ch8_call(state, opcode);
+		ch8_call(state, opcode);
+		break;
 	case 0x3:
-		return ch8_skip_eq(state, opcode);
+		ch8_skip_eq(state, opcode);
+		break;
 	case 0x4:
-		return ch8_skip_neq(state, opcode);
+		ch8_skip_neq(state, opcode);
+		break;
 	case 0x5:
-		return ch8_dispatch_5(state, opcode);
+		ch8_dispatch_5(state, opcode);
+		break;
 	case 0x6:
-		return ch8_set_imm(state, opcode);
+		ch8_set_imm(state, opcode);
+		break;
 	case 0x7:
-		return ch8_add_imm(state, opcode);
+		ch8_add_imm(state, opcode);
+		break;
 	case 0x8:
-		return ch8_dispatch_8(state, opcode);
+		ch8_dispatch_8(state, opcode);
+		break;
 	case 0x9:
-		return ch8_skip_reg_neq(state, opcode);
+		ch8_skip_reg_neq(state, opcode);
+		break;
 	case 0xA:
-		return ch8_load_ptr(state, opcode);
+		ch8_load_ptr(state, opcode);
+		break;
 	case 0xB:
-		return ch8_jump_reg(state, opcode);
+		ch8_jump_reg(state, opcode);
+		break;
 	case 0xC:
-		return ch8_rand(state, opcode);
+		ch8_rand(state, opcode);
+		break;
 	case 0xD:
-		return ch8_draw(state, opcode);
+		ch8_draw(state, opcode);
+		break;
 	case 0xE:
-		return ch8_dispatch_e(state, opcode);
+		ch8_dispatch_e(state, opcode);
+		break;
 	case 0xF:
-		return ch8_dispatch_f(state, opcode);
+		ch8_dispatch_f(state, opcode);
+		break;
 	default:
-		return E_INVALID_OPCODE;
+		ER_throw(E_INVALID_OPCODE);
 	}
 }
 
@@ -858,12 +858,12 @@ static enum ch8_error ch8_dispatch(struct ch8_state *state, uint16_t opcode)
  * Executes the next instruction from memory, incrementing the program counter
  * *before* handling the instruction.
  */
-static enum ch8_error ch8_step(struct ch8_state *state)
+static void ch8_step(struct ch8_state *state)
 {
 	uint16_t opcode;
 
 	if (state->pc > 0x0FFE)
-		return E_INVALID_ADDRESS;
+		ER_throw(E_INVALID_ADDRESS);
 
 	// Loading one byte at a time fixes crashes due to misalignment.
 	opcode = ((*(state->memory + state->pc)) << 8) |
@@ -871,7 +871,7 @@ static enum ch8_error ch8_step(struct ch8_state *state)
 
 	state->pc += 2;
 
-	return ch8_dispatch(state, opcode);
+	ch8_dispatch(state, opcode);
 }
 
 /*
@@ -881,19 +881,23 @@ static enum ch8_error ch8_step(struct ch8_state *state)
  */
 enum ch8_error ch8_run(struct ch8_state *state)
 {
-	enum ch8_error err = E_OK;
+	TRY
+	{
+		while (TRUE) {
+			ch8_step(state);
 
-	while (err == E_OK) {
-		err = ch8_step(state);
+			if (_keytest(RR_ESC))
+				ER_throw(E_SILENT_EXIT);
 
-		if (_keytest(RR_ESC))
-			return E_SILENT_EXIT;
+			if (_keytest(RR_F1))
+				ER_throw(E_EXIT_SAVE);
 
-		if (_keytest(RR_F1))
-			return E_EXIT_SAVE;
-
-		// TODO: Make a pause menu.
+			// TODO: Make a pause menu.
+		}
 	}
-
-	return err;
+	ONERR
+	{
+		return errCode;
+	}
+	ENDTRY
 }
